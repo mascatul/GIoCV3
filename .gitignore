@@ -1,0 +1,26 @@
+# Build output (any level, including source-generator/bin and obj)
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+
+# Packages built locally (the NuGet feed is F:\NugetDir)
+nupkg/
+*.nupkg
+*.snupkg
+
+# Generator debugging output
+.gen-inspect/
+generated/
+
+# IDE / user files
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+*.rsuser
+
+# OS
+Thumbs.db
+.DS_Store

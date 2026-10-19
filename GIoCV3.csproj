@@ -1,0 +1,72 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- NuGet package identity -->
+    <PackageId>GIoC</PackageId>
+    <Version>0.3.2</Version>
+    <Title>GIoC — Godot 4 IoC, INPC &amp; Commands</Title>
+    <Description>
+      Lightweight IoC container, observable INPC properties ([Observable]),
+      relay commands ([RelayCommand] / [AsyncRelayCommand]), typed static messaging
+      (Messenger), and auto-injection via [Register] + [Inject] for Godot 4 C# projects.
+      Bundles the GIoC.SourceGenerator Roslyn analyzer — no separate package needed.
+    </Description>
+    <Authors>GodotFlex</Authors>
+    <PackageTags>Godot Godot4 IoC MVVM Observable RelayCommand Messenger DependencyInjection</PackageTags>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+
+    <!-- Emit generated files to disk during development so they're visible -->
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <CompilerGeneratedFilesOutputPath>$(IntermediateOutputPath)generated</CompilerGeneratedFilesOutputPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Compile-time only — Godot.NET.Sdk provides GodotSharp at runtime in consuming projects -->
+    <PackageReference Include="GodotSharp" Version="[4.0,5.0)">
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <!-- Exclude generator source and Links addon from main project compilation.
+       Links files are standalone — users copy them into their Godot project
+       (which uses Godot.NET.Sdk so [Tool]/[GlobalClass] are processed correctly). -->
+  <ItemGroup>
+    <Compile Remove="source-generator\**\*.cs" />
+    <Compile Remove="src\Links\**\*.cs" />
+  </ItemGroup>
+
+  <!-- Source generator: reference for this project's own build -->
+  <ItemGroup>
+    <Analyzer Include="source-generator\bin\$(Configuration)\netstandard2.0\GIoC.SourceGenerator.dll"
+              Condition="Exists('source-generator\bin\$(Configuration)\netstandard2.0\GIoC.SourceGenerator.dll')" />
+    <!-- Fallback to Debug dll when building in Release for the first time -->
+    <Analyzer Include="source-generator\bin\Debug\netstandard2.0\GIoC.SourceGenerator.dll"
+              Condition="!Exists('source-generator\bin\$(Configuration)\netstandard2.0\GIoC.SourceGenerator.dll')" />
+  </ItemGroup>
+
+  <!-- Bundle the source generator into the NuGet package's analyzers folder.
+       NuGet automatically promotes DLLs from analyzers/dotnet/cs/ to <Analyzer> items
+       in the consuming project — no manual csproj edits needed. -->
+  <ItemGroup>
+    <None Include="source-generator\bin\$(Configuration)\netstandard2.0\GIoC.SourceGenerator.dll"
+          Pack="true"
+          PackagePath="analyzers/dotnet/cs"
+          Visible="false"
+          Condition="Exists('source-generator\bin\$(Configuration)\netstandard2.0\GIoC.SourceGenerator.dll')" />
+    <None Include="source-generator\bin\Debug\netstandard2.0\GIoC.SourceGenerator.dll"
+          Pack="true"
+          PackagePath="analyzers/dotnet/cs"
+          Visible="false"
+          Condition="!Exists('source-generator\bin\$(Configuration)\netstandard2.0\GIoC.SourceGenerator.dll')" />
+  </ItemGroup>
+
+  <!-- Build the source generator first, then build/pack the main project -->
+  <Target Name="BuildSourceGenerator" BeforeTargets="BeforeBuild;Pack">
+    <Exec Command="dotnet build source-generator\GIoC.SourceGenerator.csproj -c $(Configuration) --nologo -v quiet" />
+  </Target>
+
+</Project>
