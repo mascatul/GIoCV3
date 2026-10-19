@@ -31,42 +31,39 @@
     </PackageReference>
   </ItemGroup>
 
-  <!-- Exclude generator source and Links addon from main project compilation.
-       Links files are standalone — users copy them into their Godot project
+  <!-- Exclude generator source, the Links addon and the test project from the main compilation.
+       Links files are standalone - users copy them into their Godot project
        (which uses Godot.NET.Sdk so [Tool]/[GlobalClass] are processed correctly). -->
   <ItemGroup>
     <Compile Remove="source-generator\**\*.cs" />
     <Compile Remove="src\Links\**\*.cs" />
+    <Compile Remove="tests\**\*.cs" />
   </ItemGroup>
 
-  <!-- Source generator: reference for this project's own build -->
   <ItemGroup>
-    <Analyzer Include="source-generator\bin\$(Configuration)\netstandard2.0\GIoC.SourceGenerator.dll"
-              Condition="Exists('source-generator\bin\$(Configuration)\netstandard2.0\GIoC.SourceGenerator.dll')" />
-    <!-- Fallback to Debug dll when building in Release for the first time -->
-    <Analyzer Include="source-generator\bin\Debug\netstandard2.0\GIoC.SourceGenerator.dll"
-              Condition="!Exists('source-generator\bin\$(Configuration)\netstandard2.0\GIoC.SourceGenerator.dll')" />
+    <InternalsVisibleTo Include="GIoC.Tests" />
+  </ItemGroup>
+
+  <!-- Source generator: built once as a project reference and used as an analyzer for this project's own build.
+       (Replaces an Exec that re-ran "dotnet build" on the generator before every build, which raced with
+       the project-graph build when several projects referenced it.) -->
+  <ItemGroup>
+    <ProjectReference Include="source-generator\GIoC.SourceGenerator.csproj"
+                      ReferenceOutputAssembly="false"
+                      OutputItemType="Analyzer" />
   </ItemGroup>
 
   <!-- Bundle the source generator into the NuGet package's analyzers folder.
        NuGet automatically promotes DLLs from analyzers/dotnet/cs/ to <Analyzer> items
-       in the consuming project — no manual csproj edits needed. -->
-  <ItemGroup>
-    <None Include="source-generator\bin\$(Configuration)\netstandard2.0\GIoC.SourceGenerator.dll"
-          Pack="true"
-          PackagePath="analyzers/dotnet/cs"
-          Visible="false"
-          Condition="Exists('source-generator\bin\$(Configuration)\netstandard2.0\GIoC.SourceGenerator.dll')" />
-    <None Include="source-generator\bin\Debug\netstandard2.0\GIoC.SourceGenerator.dll"
-          Pack="true"
-          PackagePath="analyzers/dotnet/cs"
-          Visible="false"
-          Condition="!Exists('source-generator\bin\$(Configuration)\netstandard2.0\GIoC.SourceGenerator.dll')" />
-  </ItemGroup>
-
-  <!-- Build the source generator first, then build/pack the main project -->
-  <Target Name="BuildSourceGenerator" BeforeTargets="BeforeBuild;Pack">
-    <Exec Command="dotnet build source-generator\GIoC.SourceGenerator.csproj -c $(Configuration) --nologo -v quiet" />
+       in the consuming project - no manual csproj edits needed.
+       Added from a target so the path is resolved after the generator has been built. -->
+  <Target Name="IncludeSourceGeneratorInPackage" BeforeTargets="_GetPackageFiles">
+    <ItemGroup>
+      <None Include="source-generator\bin\$(Configuration)\netstandard2.0\GIoC.SourceGenerator.dll"
+            Pack="true"
+            PackagePath="analyzers/dotnet/cs"
+            Visible="false" />
+    </ItemGroup>
   </Target>
 
 </Project>
