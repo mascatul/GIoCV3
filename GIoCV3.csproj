@@ -7,12 +7,20 @@
 
     <!-- NuGet package identity -->
     <PackageId>GIoC</PackageId>
-    <Version>0.3.2</Version>
+    <Version>0.4.0</Version>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>
+      0.4.0: [Inject] now works on non-Node classes. Register(instance), lazy/factory registrations, Instantiate&lt;T&gt;() and
+      InjectFields(object) inject plain objects; waiting objects are held weakly; OnGIoCReady runs once; callbacks and
+      factories run outside the container lock. [Register] on a plain class generates only the OnReady() hook. The generator
+      supports nested/generic classes and namespace-qualified attributes, and reports GIOC001/GIOC002.
+    </PackageReleaseNotes>
     <Title>GIoC — Godot 4 IoC, INPC &amp; Commands</Title>
     <Description>
-      Lightweight IoC container, observable INPC properties ([Observable]),
-      relay commands ([RelayCommand] / [AsyncRelayCommand]), typed static messaging
-      (Messenger), and auto-injection via [Register] + [Inject] for Godot 4 C# projects.
+      Lightweight IoC container for Godot 4 C# projects: [Inject] on nodes and plain classes, [Register] with a
+      generated OnReady() hook, typed static messaging (Messenger), RelayCommand / AsyncRelayCommand, bindings and
+      TrackedValue. The [Observable] and [RelayCommand] attributes are declared here; their generators ship in
+      GodotFlex.SourceGenerator.
       Bundles the GIoC.SourceGenerator Roslyn analyzer — no separate package needed.
     </Description>
     <Authors>GodotFlex</Authors>
@@ -42,6 +50,11 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="GIoC.Tests" />
+  </ItemGroup>
+
+  <!-- Shown on the package page / in the IDE -->
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <!-- Source generator: built once as a project reference and used as an analyzer for this project's own build.
