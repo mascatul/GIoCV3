@@ -5,6 +5,8 @@
     <Nullable>enable</Nullable>
     <IsRoslynComponent>true</IsRoslynComponent>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <!-- Release tracking files (AnalyzerReleases.*.md) are overkill for an in-repo generator -->
+    <NoWarn>$(NoWarn);RS2008</NoWarn>
 
     <PackageId>GIoC.SourceGenerator</PackageId>
     <Version>0.1.0</Version>

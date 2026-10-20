@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <!-- Compile-time only for the container tests: no Godot engine is started, plain objects never touch native code -->
+    <PackageReference Include="GodotSharp" Version="[4.0,5.0)" />
+    <!-- Drives the generator in-process (version matches the generator project) -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\GIoCV3.csproj" />
+    <!-- Referenced as a normal assembly so the tests can run it; the library itself uses it as an analyzer -->
+    <ProjectReference Include="..\..\source-generator\GIoC.SourceGenerator.csproj" />
+  </ItemGroup>
+
+</Project>
