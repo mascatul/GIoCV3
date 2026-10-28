@@ -11,7 +11,7 @@ The package is not on nuget.org. It is built locally with `dotnet pack` and used
 (add the folder that holds `GIoC.<version>.nupkg` to your NuGet sources).
 
 - Target: `net8.0`, Godot 4.x (`GodotSharp` is a compile-time reference; your Godot project provides it).
-- The package bundles the `GIoC.SourceGenerator` Roslyn analyzer. No second package is needed for `[Register]`.
+- The package bundles the `GIoC.SourceGenerator` Roslyn analyzer. No second package is needed for `[Register]` or `[Observable]`.
 
 ## Contents
 
@@ -22,10 +22,11 @@ The package is not on nuget.org. It is built locally with `dotnet pack` and used
 5. [Nodes and `[Register]`](#nodes-and-register)
 6. [Messenger](#messenger)
 7. [Commands](#commands)
-8. [Bindings, `TrackedValue` and `Links`](#bindings-trackedvalue-and-links)
-9. [Generator diagnostics](#generator-diagnostics)
-10. [Rules and limits](#rules-and-limits)
-11. [Building and testing](#building-and-testing)
+8. [Observable properties](#observable-properties)
+9. [Bindings, `TrackedValue` and `Links`](#bindings-trackedvalue-and-links)
+10. [Generator diagnostics](#generator-diagnostics)
+11. [Rules and limits](#rules-and-limits)
+12. [Building and testing](#building-and-testing)
 
 ## Quick start
 
@@ -205,7 +206,55 @@ SaveCommand.NotifyCanExecuteChanged();  // raise CanExecuteChanged
 ```
 
 `[RelayCommand]` on a method is declared in this package, but the code that generates the command property
-comes from the separate `GodotFlex.SourceGenerator` package, as does `[Observable]`.
+comes from the separate `GodotFlex.SourceGenerator` package.
+
+## Observable properties
+
+`[Observable]` turns a private field into a public property that raises `INotifyPropertyChanged.PropertyChanged`,
+so bindings update when a value changes instead of being polled. The generator is part of this package
+(`GIoC.SourceGenerator`); no other package is needed.
+
+```csharp
+public partial class Card : Control            // the class (and any containing class) must be partial
+{
+    [Observable] private string _title = "CARD TITLE";
+    [Observable] private int _cost;
+    [Observable] private Texture2D? _icon;
+}
+// card.Title = "x";      // stores the value and raises PropertyChanged("Title")
+```
+
+Assign through the **property** (`Title = ...`); writing the field (`_title = ...`) raises nothing.
+The property name is the field name without leading underscores, first letter capitalized (`_hpValue` -> `HpValue`).
+
+What is supported:
+
+| Case | Example |
+|---|---|
+| Several variables in one field | `[Observable] private int _min, _max;` |
+| Any field type | `string`, `int`, `float`, `bool`, `int?`, `int[]`, `List<int>`, tuples, `string?`, your classes, structs without `==` |
+| Any namespace layout | block-scoped, file-scoped, global |
+| Same class name in two namespaces | each gets its own generated file |
+| Nested classes | `public partial class Shop { public partial class Item { [Observable] ... } }` |
+| Generic classes | `public partial class Box<T> { [Observable] private T _content = default!; }` |
+| Inheritance | only the root class declares the event; `[Observable]` fields of base and derived classes all raise the same `PropertyChanged` (any depth) |
+| A base that already implements `INotifyPropertyChanged` | its `RaisePropertyChanged` / `OnPropertyChanged` helper (taking `PropertyChangedEventArgs` or a `string`) is used; no second event is declared |
+| Sealed classes | the helper is generated `private` |
+| Together with `[Register]` / `[Inject]` | both generators run on the same class |
+| Attribute spellings | `[Observable]`, `[ObservableAttribute]`, `[GIoC.Observable]`, `[global::GIoC.Observable]`, combined with other attributes |
+
+Behaviour of the generated property:
+- Setting an **equal value raises nothing** (`EqualityComparer<T>.Default`: strings compare by value, any struct works).
+- One event per change, with the property name and the object as sender; the event args object is created once per field.
+- Initial values written on the field come through the property; setting a value with no subscribers is fine.
+
+A base class that already implements `INotifyPropertyChanged` but has no accessible helper makes the generator report
+`GIOC003` (see below) and generate nothing for that class. Add a `protected void OnPropertyChanged(string name)` or
+`protected virtual void OnPropertyChanged(PropertyChangedEventArgs e)` to the base.
+
+Limits: classes only (a field in a struct is ignored); the attribute goes on fields; a generated property can hide an
+inherited member of the same name (a field `_material` in a Godot `CanvasItem` gives warning `CS0108`: rename it);
+there is no `OnTitleChanged` hook; `readonly` and `static` fields are untested.
 
 ## Bindings, `TrackedValue` and `Links`
 
@@ -231,9 +280,11 @@ Namespace `GIoC.Bindings`: `BindingManager`, `Binding`, `TrackedValue<T>`, `Form
 |---|---|
 | `GIOC001` | A `[Register]` class (or one of its containing types) is not `partial`. |
 | `GIOC002` | A `[Register]` **node** defines `_Ready()`. Move the code into `partial void OnReady()`. |
+| `GIOC003` | A class with `[Observable]` fields has a base that already implements `INotifyPropertyChanged` but no accessible `RaisePropertyChanged` / `OnPropertyChanged` helper. |
 
-Supported shapes: nested classes (containing types must be `partial`), generic classes, `[Register]`,
-`[RegisterAttribute]`, `[GIoC.Register]`, `[global::GIoC.Register]`.
+Supported shapes (for both `[Register]` and `[Observable]`): nested classes (containing types must be `partial`), generic
+classes, and the spellings `[Register]`, `[RegisterAttribute]`, `[GIoC.Register]`, `[global::GIoC.Register]`
+(likewise for `[Observable]`).
 
 ## Rules and limits
 
