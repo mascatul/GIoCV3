@@ -571,6 +571,35 @@ public class ContainerTests
         Assert.False(ioc.TryResolve<SvcB>(out _));
     }
 
+    // Regression: "is it registered?" and "queue this object" used to be two separate steps, so a registration that
+    // landed between them announced to an empty queue and the object waited forever (lost wake-up).
+    // Many short rounds with the two sides released together make that interleaving likely.
+    [Fact]
+    public void ConcurrentRegisterAndInject_NeverLosesAWakeUp()
+    {
+        for (int round = 0; round < 300; round++)
+        {
+            var ioc = NewIoc();
+            var managers = Enumerable.Range(0, 6).Select(_ => new ReadyManager()).ToArray();
+            using var go = new ManualResetEventSlim(false);
+
+            var tasks = new List<Task>();
+            foreach (var m in managers)
+                tasks.Add(Task.Run(() => { go.Wait(); ioc.InjectFields(m); }));
+            tasks.Add(Task.Run(() => { go.Wait(); ioc.Register(new SvcA()); }));
+            tasks.Add(Task.Run(() => { go.Wait(); ioc.Register(new SvcB()); }));
+
+            go.Set();
+            Task.WaitAll(tasks.ToArray());
+
+            foreach (var m in managers)
+            {
+                Assert.True(m.A != null && m.B != null, $"round {round}: an object was left waiting although both services are registered");
+                Assert.Equal(1, m.ReadyCalls);
+            }
+        }
+    }
+
     [Fact]
     public void ConcurrentRegisterAndInject_DoesNotThrow()
     {

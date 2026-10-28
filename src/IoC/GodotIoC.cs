@@ -263,14 +263,23 @@ public sealed class GodotIoC
             if (field.GetValue(target) != null)
                 continue;   // already filled (earlier pass, manual assignment or initializer)
 
-            if (TryResolveCore(field.FieldType, attr.Name, out var dependency))
+            while (true)
             {
-                field.SetValue(target, dependency);
-            }
-            else
-            {
-                anyPending = true;
-                Enqueue(field.FieldType, target);
+                if (TryResolveCore(field.FieldType, attr.Name, out var dependency))
+                {
+                    field.SetValue(target, dependency);
+                    break;
+                }
+
+                // Queue only if, under the same lock a registration needs, the dependency is still missing.
+                // Checking and queueing as two separate steps lost wake-ups: a registration landing in between
+                // announced to an empty queue and the object waited forever.
+                if (EnqueueIfMissing(field.FieldType, attr.Name, target))
+                {
+                    anyPending = true;
+                    break;
+                }
+                // Registered in the meantime: resolve again
             }
         }
 
@@ -320,10 +329,15 @@ public sealed class GodotIoC
 
     // ── Wait queue ────────────────────────────────────────────────────────────
 
-    private void Enqueue(Type dependencyType, object target)
+    // Returns false (without queueing) when the dependency has been registered, so the caller resolves it instead.
+    private bool EnqueueIfMissing(Type dependencyType, string? name, object target)
     {
         lock (_lock)
         {
+            var key = (dependencyType, name);
+            if (_registry.ContainsKey(key) || _factories.ContainsKey(key))
+                return false;
+
             if (!_pending.TryGetValue(dependencyType, out var list))
                 _pending[dependencyType] = list = new List<WeakReference<object>>();
 
@@ -331,9 +345,10 @@ public sealed class GodotIoC
 
             foreach (var weak in list)
                 if (weak.TryGetTarget(out var existing) && ReferenceEquals(existing, target))
-                    return;
+                    return true;   // already waiting for this type
 
             list.Add(new WeakReference<object>(target));
+            return true;
         }
     }
 
